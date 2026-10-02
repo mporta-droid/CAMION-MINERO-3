@@ -188,7 +188,7 @@ function applySceneMode(){
     key.intensity=1.3;key.color.set(0xcbd9e5);rim.intensity=.8;renderer.toneMappingExposure=1.15;
   }
   truckHeadlights.forEach(x=>{if(x.isSpotLight)x.visible=truckLightsEnabled;});
-  headlightBulbs.forEach(x=>{x.visible=truckLightsEnabled;if(x.material&&x.material.transparent)x.material.opacity=truckLightsEnabled?.48:0;});
+  headlightBulbs.forEach(x=>{x.visible=truckLightsEnabled;if(x.material&&x.material.transparent)x.material.opacity=truckLightsEnabled ? .48 : 0;});
   const lb=document.getElementById('truckLightsBtn');if(lb)lb.textContent=truckLightsEnabled?'Faros: activados':'Faros: apagados';
 }
 document.getElementById('sceneSelect').addEventListener('change',e=>{sceneMode=e.target.value;applySceneMode();document.getElementById('viewerHint').textContent=({day:'Modo día: luz ambiental intensa · Arrastrar: rotar · Rueda: zoom',night:'Modo noche: faros del camión · Arrastrar: rotar · Rueda: zoom',fog:'Modo niebla: visibilidad atmosférica reducida',rain:'Modo lluvia: precipitación animada · Arrastrar: rotar · Rueda: zoom'})[sceneMode];});
