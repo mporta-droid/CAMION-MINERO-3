@@ -138,17 +138,35 @@ const fullscreenBtn=document.getElementById('fullscreenBtn');const modelCard=doc
 function setupWheelAnimation(root){
   wheelAnimators=[];
   const wheelName=/(wheel|tire|tyre|rueda|neumatic|neum[aá]tico)/i;
+  const named=[];
   root.traverse(obj=>{
-    if(!obj.isMesh||!wheelName.test(obj.name||''))return;
-    if(!obj.geometry)return;
+    if(!obj.isMesh||!wheelName.test(obj.name||'')||!obj.geometry)return;
     if(!obj.geometry.boundingBox)obj.geometry.computeBoundingBox();
     const box=obj.geometry.boundingBox;if(!box)return;
-    const size=box.getSize(new THREE.Vector3());
-    const dims=[size.x,size.y,size.z];
-    const axleIndex=dims.indexOf(Math.min(...dims));
-    const axis=['x','y','z'][axleIndex];
-    wheelAnimators.push({object:obj,axis,base:obj.rotation[axis]});
+    const size=box.getSize(new THREE.Vector3()),dims=[size.x,size.y,size.z];
+    const axis=['x','y','z'][dims.indexOf(Math.min(...dims))];
+    named.push({object:obj,axis,base:obj.rotation[axis]});
   });
+  wheelAnimators=named;
+  // Si el GLB usa nombres genéricos (Mesh 1, Mesh 2...), intenta detectar neumáticos por su forma y posición.
+  if(!wheelAnimators.length){
+    const truckBox=new THREE.Box3().setFromObject(root),truckSize=truckBox.getSize(new THREE.Vector3());
+    const maxDim=Math.max(truckSize.x,truckSize.y,truckSize.z)||1;
+    root.traverse(obj=>{
+      if(!obj.isMesh||!obj.geometry)return;
+      const box=new THREE.Box3().setFromObject(obj);
+      if(box.isEmpty())return;
+      const size=box.getSize(new THREE.Vector3()),dims=[size.x,size.y,size.z].sort((a,b)=>b-a);
+      const center=box.getCenter(new THREE.Vector3());
+      const lowEnough=center.y<truckBox.min.y+truckSize.y*.48;
+      const wheelSized=dims[0]>maxDim*.065&&dims[0]<maxDim*.32;
+      const roundProfile=dims[1]>dims[0]*.58&&dims[1]<dims[0]*1.28;
+      const thinAxle=dims[2]<dims[0]*.68;
+      if(!lowEnough||!wheelSized||!roundProfile||!thinAxle)return;
+      const axis=['x','y','z'][[size.x,size.y,size.z].indexOf(Math.min(size.x,size.y,size.z))];
+      wheelAnimators.push({object:obj,axis,base:obj.rotation[axis]});
+    });
+  }
 }
 function initEngineAudio(){
   const AudioCtx=window.AudioContext||window.webkitAudioContext;
