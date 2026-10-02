@@ -144,8 +144,8 @@ function setupTruckLights(root){
   // Se elevan los faros delanteros para que queden más cerca de la zona de cabina.
   const frontY=box.min.y+Math.max(.18,size.y*.53), rearY=box.min.y+Math.max(.18,size.y*.32);
   const front=alongX
-    ? {pos:new THREE.Vector3(box.max.x-size.x*.018,frontY,center.z),dir:new THREE.Vector3(-1,-.035,0)}
-    : {pos:new THREE.Vector3(center.x,frontY,box.max.z-size.z*.018),dir:new THREE.Vector3(0,-.035,-1)};
+    ? {pos:new THREE.Vector3(box.max.x-size.x*.018,frontY,center.z),dir:new THREE.Vector3(1,-.035,0)}
+    : {pos:new THREE.Vector3(center.x,frontY,box.max.z-size.z*.018),dir:new THREE.Vector3(0,-.035,1)};
   const rear=alongX
     ? {pos:new THREE.Vector3(box.min.x+size.x*.018,rearY,center.z),dir:new THREE.Vector3(-1,0,0)}
     : {pos:new THREE.Vector3(center.x,rearY,box.min.z+size.z*.018),dir:new THREE.Vector3(0,0,-1)};
