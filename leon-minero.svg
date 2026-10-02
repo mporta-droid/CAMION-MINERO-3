@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#10243a"/><stop offset="1" stop-color="#050b14"/></linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff0a1"/><stop offset=".38" stop-color="#ffbd37"/><stop offset="1" stop-color="#c96b08"/></linearGradient>
+    <linearGradient id="face" x1="0" y1="0" x2="0.9" y2="1"><stop stop-color="#ffe58a"/><stop offset=".5" stop-color="#f5a91b"/><stop offset="1" stop-color="#a94e08"/></linearGradient>
+  </defs>
+  <rect x="5" y="5" width="246" height="246" rx="42" fill="url(#bg)" stroke="#28445c" stroke-width="3"/>
+  <path d="M128 24 151 38 180 33 190 58 215 73 207 99 226 121 210 143 215 170 190 182 181 210 153 211 128 232 103 211 75 210 66 184 41 171 46 144 29 122 48 99 41 73 66 59 76 34 104 39Z" fill="url(#gold)" stroke="#ffdf75" stroke-width="2.5" stroke-linejoin="round"/>
+  <path d="M80 61 105 72 128 61 151 72 176 61 190 88 178 108 183 133 168 159 157 185 128 207 99 185 88 159 73 133 78 108 66 88Z" fill="#0a1421" stroke="#f5b532" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M83 83 105 91 119 111 105 119 87 110Z" fill="#e99516"/>
+  <path d="M173 83 151 91 137 111 151 119 169 110Z" fill="#e99516"/>
+  <path d="M88 127 Q103 111 119 128 L111 139 94 139Z" fill="#fff0a1"/>
+  <path d="M168 127 Q153 111 137 128 L145 139 162 139Z" fill="#fff0a1"/>
+  <path d="M96 130 111 132 104 137Z M160 130 145 132 152 137Z" fill="#07111c"/>
+  <path d="M110 151 Q128 140 146 151 L137 164 128 169 119 164Z" fill="url(#face)" stroke="#ffdc69" stroke-width="1.5"/>
+  <path d="M119 164 128 169 137 164 M128 169 128 183 M128 183 Q115 194 104 181 M128 183 Q141 194 152 181" fill="none" stroke="#ffd76b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M57 100 76 113 69 139 51 126Z M199 100 180 113 187 139 205 126Z" fill="#17283a" stroke="#e99a1c" stroke-width="3"/>
+  <path d="M128 28 134 48 128 61 122 48Z" fill="#fff1a3"/>
+  <circle cx="128" cy="128" r="3.5" fill="#fff6c5"/>
+</svg>
