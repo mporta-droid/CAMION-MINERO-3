@@ -138,11 +138,12 @@ const fullscreenBtn=document.getElementById('fullscreenBtn');const modelCard=doc
 function setupWheelAnimation(root){
   wheelAnimators=[];
   const wheelName=/(wheel|tire|tyre|rueda|neumatic|neum[aá]tico)/i;
-  const candidates=[];
+  const rawCandidates=[];
   const truckBox=new THREE.Box3().setFromObject(root);
   const truckSize=truckBox.getSize(new THREE.Vector3());
   const maxDim=Math.max(truckSize.x,truckSize.y,truckSize.z)||1;
   root.updateWorldMatrix(true,true);
+  // Primero detectar todas las ruedas sin modificar la jerarquía durante traverse().
   root.traverse(obj=>{
     if(!obj.isMesh||!obj.geometry||!obj.parent)return;
     const worldBox=new THREE.Box3().setFromObject(obj);
@@ -158,22 +159,25 @@ function setupWheelAnimation(root){
     const axleThin=sorted[2]<sorted[0]*.98;
     if(!named&&(!lowEnough||!wheelSized||!roundProfile||!axleThin))return;
     if(named&&(!wheelSized||!roundProfile))return;
-    const parent=obj.parent;
+    rawCandidates.push({object:obj,center,worldSize,dims});
+  });
+  rawCandidates.forEach(candidate=>{
+    const obj=candidate.object,parent=obj.parent;
+    if(!parent)return;
     parent.updateWorldMatrix(true,false);
-    const axleWorldIndex=dims.indexOf(Math.min(...dims));
+    const axleWorldIndex=candidate.dims.indexOf(Math.min(...candidate.dims));
     const axleWorld=new THREE.Vector3(axleWorldIndex===0?1:0,axleWorldIndex===1?1:0,axleWorldIndex===2?1:0);
     const parentAxisLocal=axleWorld.clone().applyQuaternion(parent.getWorldQuaternion(new THREE.Quaternion()).invert()).normalize();
     // Pivote centrado en la geometría: la rueda gira sobre su eje aunque el origen del mesh esté desplazado.
-    const centerLocal=parent.worldToLocal(center.clone());
+    const centerLocal=parent.worldToLocal(candidate.center.clone());
     const pivot=new THREE.Group();
     pivot.name='WheelSpinPivot_'+(obj.name||'wheel');
     parent.add(pivot);
     pivot.position.copy(centerLocal);
     pivot.updateWorldMatrix(true,false);
     pivot.attach(obj);
-    candidates.push({object:pivot,axisParentLocal:parentAxisLocal,baseQuaternion:pivot.quaternion.clone(),sourceName:obj.name||'mesh',center,worldSize});
+    wheelAnimators.push({object:pivot,axisParentLocal:parentAxisLocal,baseQuaternion:pivot.quaternion.clone(),sourceName:obj.name||'mesh'});
   });
-  wheelAnimators=candidates;
   console.info('Ruedas/piezas giratorias detectadas:',wheelAnimators.length,wheelAnimators.map(w=>w.sourceName));
 }
 function initEngineAudio(){
