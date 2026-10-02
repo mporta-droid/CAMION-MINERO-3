@@ -157,10 +157,12 @@ function setupWheelAnimation(root){
     const named=wheelName.test(obj.name||'');
     const lowEnough=center.y<truckBox.min.y+truckSize.y*.96;
     const wheelSized=sorted[0]>maxDim*.025&&sorted[0]<maxDim*(named?.68:.56);
-    const roundProfile=sorted[1]>sorted[0]*(named?.25:.30);
-    const axleThin=sorted[2]<sorted[0]*1.04;
+    // Una rueda debe tener dos dimensiones grandes y similares (diámetro),
+    // y una tercera dimensión menor (ancho). Esto excluye jaulas, barandas y chasis.
+    const roundProfile=sorted[1]>sorted[0]*(named?.58:.68);
+    const axleThin=sorted[2]<sorted[0]*(named?.90:.76);
     if(named){
-      if(!wheelSized||!roundProfile)return;
+      if(!wheelSized||!roundProfile||!axleThin)return;
     }else if(!lowEnough||!wheelSized||!roundProfile||!axleThin)return;
     rawCandidates.push({object:obj,center,dims,worldSize});
   });
