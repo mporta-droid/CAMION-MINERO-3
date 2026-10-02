@@ -143,7 +143,9 @@ function setupWheelAnimation(root){
   const truckSize=truckBox.getSize(new THREE.Vector3());
   const maxDim=Math.max(truckSize.x,truckSize.y,truckSize.z)||1;
   root.updateWorldMatrix(true,true);
-  // Primero detectar todas las ruedas sin modificar la jerarquía durante traverse().
+
+  // Detectar ruedas por nombre y también por geometría. En este GLB las ruedas
+  // delanteras pueden estar exportadas con nombres genéricos ("Mesh").
   root.traverse(obj=>{
     if(!obj.isMesh||!obj.geometry||!obj.parent)return;
     const worldBox=new THREE.Box3().setFromObject(obj);
@@ -153,32 +155,42 @@ function setupWheelAnimation(root){
     const center=worldBox.getCenter(new THREE.Vector3());
     const sorted=[...dims].sort((x,y)=>y-x);
     const named=wheelName.test(obj.name||'');
-    const lowEnough=center.y<truckBox.min.y+truckSize.y*.78;
-    const wheelSized=sorted[0]>maxDim*.025&&sorted[0]<maxDim*(named?.58:.48);
-    const roundProfile=sorted[1]>sorted[0]*.40;
-    const axleThin=sorted[2]<sorted[0]*.98;
-    if(!named&&(!lowEnough||!wheelSized||!roundProfile||!axleThin))return;
-    if(named&&(!wheelSized||!roundProfile))return;
-    rawCandidates.push({object:obj,center,worldSize,dims});
+    const lowEnough=center.y<truckBox.min.y+truckSize.y*.96;
+    const wheelSized=sorted[0]>maxDim*.025&&sorted[0]<maxDim*(named?.68:.56);
+    const roundProfile=sorted[1]>sorted[0]*(named?.25:.30);
+    const axleThin=sorted[2]<sorted[0]*1.04;
+    if(named){
+      if(!wheelSized||!roundProfile)return;
+    }else if(!lowEnough||!wheelSized||!roundProfile||!axleThin)return;
+    rawCandidates.push({object:obj,center,dims,worldSize});
   });
+
+  // Evitar que una rueda se envuelva más de una vez por mallas duplicadas
+  // idénticas en la misma posición.
+  const usedCenters=[];
   rawCandidates.forEach(candidate=>{
     const obj=candidate.object,parent=obj.parent;
     if(!parent)return;
+    const center=candidate.center;
+    const duplicate=usedCenters.some(c=>c.distanceTo(center)<maxDim*.012);
+    if(duplicate)return;
+    usedCenters.push(center.clone());
+
     parent.updateWorldMatrix(true,false);
     const axleWorldIndex=candidate.dims.indexOf(Math.min(...candidate.dims));
     const axleWorld=new THREE.Vector3(axleWorldIndex===0?1:0,axleWorldIndex===1?1:0,axleWorldIndex===2?1:0);
-    const parentAxisLocal=axleWorld.clone().applyQuaternion(parent.getWorldQuaternion(new THREE.Quaternion()).invert()).normalize();
-    // Pivote centrado en la geometría: la rueda gira sobre su eje aunque el origen del mesh esté desplazado.
-    const centerLocal=parent.worldToLocal(candidate.center.clone());
+    const parentWorldQuaternion=parent.getWorldQuaternion(new THREE.Quaternion());
+    const axisParentLocal=axleWorld.clone().applyQuaternion(parentWorldQuaternion.invert()).normalize();
+    const centerLocal=parent.worldToLocal(center.clone());
     const pivot=new THREE.Group();
     pivot.name='WheelSpinPivot_'+(obj.name||'wheel');
     parent.add(pivot);
     pivot.position.copy(centerLocal);
     pivot.updateWorldMatrix(true,false);
     pivot.attach(obj);
-    wheelAnimators.push({object:pivot,axisParentLocal:parentAxisLocal,baseQuaternion:pivot.quaternion.clone(),sourceName:obj.name||'mesh'});
+    wheelAnimators.push({object:pivot,axisParentLocal,baseQuaternion:pivot.quaternion.clone(),sourceName:obj.name||'mesh',center:center.clone()});
   });
-  console.info('Ruedas/piezas giratorias detectadas:',wheelAnimators.length,wheelAnimators.map(w=>w.sourceName));
+  console.info('Ruedas/piezas giratorias detectadas:',wheelAnimators.length,wheelAnimators.map(w=>({name:w.sourceName,center:w.center.toArray()})));
 }
 function initEngineAudio(){
   const audio=document.getElementById('engineAudio');
@@ -202,16 +214,16 @@ function startFallbackEngineSound(){
     if(ctx.state==='suspended')ctx.resume();
     stopFallbackEngineSound();
     const master=ctx.createGain();master.gain.value=.0001;master.connect(ctx.destination);
-    master.gain.setTargetAtTime(.20,ctx.currentTime,.3);
+    master.gain.setTargetAtTime(.34,ctx.currentTime,.25);
     const low=ctx.createOscillator();low.type='sawtooth';low.frequency.value=48;
-    const lowGain=ctx.createGain();lowGain.gain.value=.22;low.connect(lowGain);lowGain.connect(master);
+    const lowGain=ctx.createGain();lowGain.gain.value=.42;low.connect(lowGain);lowGain.connect(master);
     const harmonic=ctx.createOscillator();harmonic.type='triangle';harmonic.frequency.value=96;
-    const harmonicGain=ctx.createGain();harmonicGain.gain.value=.08;harmonic.connect(harmonicGain);harmonicGain.connect(master);
+    const harmonicGain=ctx.createGain();harmonicGain.gain.value=.16;harmonic.connect(harmonicGain);harmonicGain.connect(master);
     const filter=ctx.createBiquadFilter();filter.type='lowpass';filter.frequency.value=190;filter.Q.value=.7;
     const buffer=ctx.createBuffer(1,ctx.sampleRate*2,ctx.sampleRate),data=buffer.getChannelData(0);
     for(let i=0;i<data.length;i++)data[i]=(Math.random()*2-1)*.18;
     const noise=ctx.createBufferSource();noise.buffer=buffer;noise.loop=true;
-    const noiseGain=ctx.createGain();noiseGain.gain.value=.12;
+    const noiseGain=ctx.createGain();noiseGain.gain.value=.07;
     noise.connect(filter);filter.connect(noiseGain);noiseGain.connect(master);
     low.start();harmonic.start();noise.start();
     fallbackEngineNodes=[master,low,lowGain,harmonic,harmonicGain,filter,noise,noiseGain];
@@ -226,13 +238,18 @@ function setEngineRunning(on){
   if(on){
     if(audio){
       audio.currentTime=0;
+      audio.volume=0.9;
       const playPromise=audio.play();
       if(playPromise&&playPromise.then){
-        playPromise.then(()=>stopFallbackEngineSound()).catch(err=>{
-          console.warn('No se pudo reproducir el archivo de sonido del motor:',err);
+        playPromise.then(()=>{
+          stopFallbackEngineSound();
+        }).catch(err=>{
+          console.warn('No se pudo reproducir el archivo de sonido del motor; se activa el sonido de respaldo:',err);
           startFallbackEngineSound();
         });
-      }else if(audio.error)startFallbackEngineSound();
+      }else if(audio.error||audio.readyState===0)startFallbackEngineSound();
+      // Si el archivo no existe o falla después de llamar play(), usar respaldo.
+      if(audio.error)startFallbackEngineSound();
     }else startFallbackEngineSound();
     truckLightsEnabled=true;applySceneMode();
   }else{
