@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gemelo Digital | Camión Minero</title>
+<style>
+:root{color-scheme:dark;--bg:#0a1018;--panel:#111b27;--line:#253445;--text:#e7eef7;--muted:#8fa2b8;--accent:#f2b632;--green:#5ed6a0}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Segoe UI,Arial,sans-serif;overflow:hidden}
+.app{height:100vh;display:grid;grid-template-rows:68px 1fr}
+header{display:flex;align-items:center;justify-content:space-between;padding:0 22px;border-bottom:1px solid var(--line);background:#0d1520;gap:16px}
+.brand{display:flex;align-items:center;gap:12px}.mark{width:36px;height:36px;border-radius:10px;background:var(--accent);color:#111;font-weight:900;display:grid;place-items:center}.brand h1{font-size:15px;margin:0;letter-spacing:.08em}.brand p{margin:4px 0 0;color:var(--muted);font-size:11px}
+.status{font-size:11px;color:var(--green);border:1px solid #28694f;padding:7px 10px;border-radius:99px;white-space:nowrap}
+main{min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 330px}.viewport{position:relative;min-width:0;min-height:0;background:radial-gradient(ellipse at 50% 45%,#1c2a39 0%,#101a27 48%,#0a1018 100%)}#stage{position:absolute;inset:0}.overlay{position:absolute;pointer-events:none;left:20px;top:18px}.eyebrow{color:var(--accent);font-size:10px;letter-spacing:.18em;font-weight:700}.overlay h2{margin:7px 0 5px;font-size:21px}.overlay p{color:var(--muted);font-size:12px;margin:0}.controls{position:absolute;bottom:18px;left:20px;display:flex;gap:8px;flex-wrap:wrap}.controls button{pointer-events:auto;background:#152231;border:1px solid #34485d;color:var(--text);padding:9px 12px;border-radius:8px;font-size:11px;cursor:pointer}.controls button:hover{border-color:var(--accent)}.hint{position:absolute;bottom:22px;right:20px;color:#8fa2b8;font-size:11px;background:#0a1018aa;padding:8px 10px;border-radius:8px}
+aside{border-left:1px solid var(--line);background:var(--panel);padding:18px;overflow:auto}.section-label{font-size:10px;color:var(--muted);letter-spacing:.15em;font-weight:700;margin:0 0 12px}.model-status{border:1px solid var(--line);background:#0d1621;padding:13px;border-radius:10px;margin-bottom:20px}.model-status strong{display:block;font-size:13px;margin-bottom:6px}.model-status span{font-size:11px;color:var(--muted);line-height:1.5}.component-list{display:flex;flex-direction:column;gap:6px;margin-bottom:20px}.component{width:100%;display:flex;align-items:center;justify-content:space-between;text-align:left;gap:8px;background:#0d1621;border:1px solid var(--line);color:var(--text);padding:10px;border-radius:8px;cursor:pointer}.component.active{border-color:var(--accent);background:#2b2618}.component .name{font-size:12px}.component small{color:var(--muted);font-size:10px}.detail{border:1px solid var(--line);border-radius:10px;padding:14px;background:#0d1621}.detail h3{margin:0 0 6px;font-size:15px}.detail p{font-size:11px;line-height:1.5;color:var(--muted);margin:0 0 14px}.metric-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.metric{padding:10px;background:#162332;border-radius:8px}.metric span{display:block;font-size:10px;color:var(--muted);margin-bottom:6px}.metric strong{font-size:17px}.metric em{font-style:normal;font-size:10px;color:var(--muted)}.notice{font-size:10px;color:#e5bb60;line-height:1.5;margin-top:12px}.loading{position:absolute;inset:0;display:grid;place-items:center;text-align:center;color:var(--muted);font-size:13px;background:#0a1018aa;z-index:2}.loading.hidden{display:none}.spinner{width:28px;height:28px;border:3px solid #304256;border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 12px}@keyframes spin{to{transform:rotate(360deg)}}
+@media(max-width:850px){body{overflow:auto}.app{height:auto;min-height:100vh;grid-template-rows:60px auto}main{grid-template-columns:1fr}.viewport{height:58vh;min-height:380px}aside{border-left:0;border-top:1px solid var(--line)}.hint{display:none}}
+</style>
+<script type="importmap">
+{"imports":{"three":"https://unpkg.com/three@0.164.1/build/three.module.js","three/addons/":"https://unpkg.com/three@0.164.1/examples/jsm/"}}
+</script>
+</head>
+<body>
+<div class="app">
+<header>
+  <div class="brand"><div class="mark">3D</div><div><h1>CAMIÓN MINERO · GEMELO DIGITAL</h1><p>PROTOTIPO DE VISUALIZACIÓN INDUSTRIAL</p></div></div>
+  <div class="status" id="status">● INICIANDO VISOR</div>
+</header>
+<main>
+  <section class="viewport">
+    <div id="stage"></div>
+    <div class="loading" id="loading"><div><div class="spinner"></div><div id="loadingText">Cargando modelo 3D…</div></div></div>
+    <div class="overlay"><div class="eyebrow">ACTIVO · CAMIÓN MINERO</div><h2>Explorador 3D</h2><p>Selecciona un componente en el panel o directamente en el modelo.</p></div>
+    <div class="controls"><button id="reset">↺ Restablecer vista</button><button id="wire">◇ Alternar malla</button><button id="fit">⌖ Encuadrar modelo</button></div>
+    <div class="hint">Arrastrar: rotar · Rueda: zoom · Clic: seleccionar</div>
+  </section>
+  <aside>
+    <p class="section-label">ESTADO DEL MODELO</p>
+    <div class="model-status"><strong id="modelName">Modelo pendiente</strong><span id="modelInfo">Preparando escena 3D.</span></div>
+    <p class="section-label">COMPONENTES DETECTADOS</p>
+    <div class="component-list" id="componentList"><div style="font-size:12px;color:#8fa2b8">Esperando al modelo…</div></div>
+    <p class="section-label">FICHA DEL COMPONENTE</p>
+    <div class="detail"><h3 id="detailName">Sin selección</h3><p id="detailDesc">Selecciona una pieza del camión para consultar sus detalles.</p><div class="metric-grid"><div class="metric"><span>Horas de parada</span><strong id="downtime">—</strong><em>h acumuladas</em></div><div class="metric"><span>N.º de fallas</span><strong id="failures">—</strong><em>eventos</em></div><div class="metric"><span>MTTR</span><strong id="mttr">—</strong><em>h por intervención</em></div><div class="metric"><span>Estado</span><strong id="health" style="font-size:13px">Sin datos</strong><em>demostración</em></div></div><div class="notice">Los indicadores son ilustrativos hasta conectar la base real de mantenimiento. Los nombres detectados dependen de cómo se exportó el archivo GLB.</div></div>
+  </aside>
+</main>
+</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+const stage=document.getElementById('stage');
+const loading=document.getElementById('loading');
+const loadingText=document.getElementById('loadingText');
+const status=document.getElementById('status');
+const scene=new THREE.Scene();
+scene.background=null;
+const camera=new THREE.PerspectiveCamera(45,1,0.1,10000);
+camera.position.set(8,6,10);
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.15;
+stage.appendChild(renderer.domElement);
+const controls=new OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true;controls.dampingFactor=.06;controls.target.set(0,1,0);
+scene.add(new THREE.HemisphereLight(0xc7ddff,0x26313b,2.0));
+const key=new THREE.DirectionalLight(0xffffff,3.2);key.position.set(8,12,8);scene.add(key);
+const rim=new THREE.DirectionalLight(0x8ebfff,2.1);rim.position.set(-8,5,-7);scene.add(rim);
+const ground=new THREE.GridHelper(30,30,0x35495b,0x243444);ground.position.y=-.02;scene.add(ground);
+const floor=new THREE.Mesh(new THREE.CircleGeometry(15,64),new THREE.MeshStandardMaterial({color:0x111d29,roughness:1,metalness:0}));floor.rotation.x=-Math.PI/2;floor.position.y=-.04;scene.add(floor);floor.renderOrder=-1;
+let root=null,modelMeshes=[],originalMaterials=new Map(),wireframe=false,selected=null;
+const raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2();
+const maintenance={
+ 'bastidor':{downtime:'492.6',failures:'43',mttr:'11.46',health:'Crítico',desc:'Estructura principal y soporte de los conjuntos del vehículo.'},
+ 'tolba':{downtime:'27.0',failures:'9',mttr:'3.00',health:'Vigilar',desc:'Tolva minera para transporte de material.'},
+ 'neumatico':{downtime:'106.3',failures:'86',mttr:'1.24',health:'Frecuente',desc:'Conjunto de rueda y neumático.'},
+ 'motor':{downtime:'196.7',failures:'28',mttr:'7.03',health:'Vigilar',desc:'Sistema motriz del camión.'},
+ 'piston':{downtime:'34.6',failures:'8',mttr:'4.33',health:'Referencia',desc:'Elemento lineal del mecanismo hidráulico.'},
+ 'cilindro':{downtime:'88.8',failures:'22',mttr:'4.04',health:'Referencia',desc:'Cilindro del sistema hidráulico.'},
+ 'caterpilar':{downtime:'77.0',failures:'27',mttr:'2.85',health:'Referencia',desc:'Conjunto identificado por el nombre de la malla exportada.'}
+};
+function cleanName(name){return (name||'Componente sin nombre').replace(/[-_]\d+$/,'').replace(/[-_]/g,' ').replace(/\s+/g,' ').trim();}
+function classify(name){const n=(name||'').toLowerCase();if(n.includes('tolba'))return 'tolba';if(n.includes('neumatico')||n.includes('rueda'))return 'neumatico';if(n.includes('piston'))return 'piston';if(n.includes('cilindro'))return 'cilindro';if(n.includes('caterpilar')||n.includes('bastidor'))return 'caterpilar';if(n.includes('motor'))return 'motor';return '';}
+function choose(mesh){if(selected&&originalMaterials.has(selected))selected.material=originalMaterials.get(selected);selected=mesh||null;if(selected){if(!originalMaterials.has(selected))originalMaterials.set(selected,selected.material);selected.material=new THREE.MeshStandardMaterial({color:0xf2b632,metalness:.25,roughness:.45,emissive:0x392600});}document.querySelectorAll('.component').forEach(b=>b.classList.toggle('active',b.dataset.node===(selected?selected.uuid:'')));updateDetail(selected);}
+function updateDetail(mesh){if(!mesh){document.getElementById('detailName').textContent='Sin selección';document.getElementById('detailDesc').textContent='Selecciona una pieza del camión para consultar sus detalles.';['downtime','failures','mttr'].forEach(id=>document.getElementById(id).textContent='—');document.getElementById('health').textContent='Sin datos';return;}const name=cleanName(mesh.name),key=classify(name),d=maintenance[key];document.getElementById('detailName').textContent=name;document.getElementById('detailDesc').textContent=d?d.desc:'Pieza detectada en el archivo 3D. Falta asociarla a un subsistema de mantenimiento.';document.getElementById('downtime').textContent=d?d.downtime:'—';document.getElementById('failures').textContent=d?d.failures:'—';document.getElementById('mttr').textContent=d?d.mttr:'—';document.getElementById('health').textContent=d?d.health:'Sin datos';}
+function buildList(){const list=document.getElementById('componentList');list.innerHTML='';const seen=new Set();modelMeshes.forEach(mesh=>{if(seen.has(mesh.uuid))return;seen.add(mesh.uuid);const b=document.createElement('button');b.className='component';b.dataset.node=mesh.uuid;b.innerHTML='<span class="name"></span><small>Seleccionar ↗</small>';b.querySelector('.name').textContent=cleanName(mesh.name)||'Componente';b.addEventListener('click',()=>{choose(mesh);});list.appendChild(b);});}
+function frameModel(){if(!root)return;const box=new THREE.Box3().setFromObject(root);const size=box.getSize(new THREE.Vector3());const center=box.getCenter(new THREE.Vector3());root.position.sub(center);const maxDim=Math.max(size.x,size.y,size.z)||1;const distance=maxDim*1.65;camera.near=Math.max(maxDim/1000,.01);camera.far=maxDim*100;camera.position.set(distance*.95,distance*.6,distance*1.15);camera.updateProjectionMatrix();controls.target.set(0,0,0);controls.minDistance=maxDim*.15;controls.maxDistance=maxDim*8;controls.update();ground.scale.setScalar(Math.max(1,maxDim/20));ground.position.y=-size.y*.5;floor.scale.setScalar(Math.max(1,maxDim/30));floor.position.y=ground.position.y-.03;}
+const loader=new GLTFLoader();
+loader.load('./camion.glb',gltf=>{root=gltf.scene;scene.add(root);root.traverse(o=>{if(o.isMesh){modelMeshes.push(o);originalMaterials.set(o,o.material);o.castShadow=true;o.receiveShadow=true;}});frameModel();buildList();document.getElementById('modelName').textContent='camion.glb cargado';document.getElementById('modelInfo').textContent=modelMeshes.length+' mallas detectadas en el modelo. Selección por clic habilitada.';status.textContent='● MODELO CARGADO';status.style.color='var(--green)';loading.classList.add('hidden');if(modelMeshes.length)choose(modelMeshes[0]);},xhr=>{if(xhr.total)loadingText.textContent='Cargando modelo 3D… '+Math.round(xhr.loaded/xhr.total*100)+'%';},err=>{console.error(err);loadingText.innerHTML='No se pudo cargar <b>camion.glb</b>.<br>Comprueba que el archivo esté en la raíz del repositorio y que abras la web mediante un servidor.';status.textContent='● FALTA MODELO';status.style.color='#f2b632';document.getElementById('modelName').textContent='Modelo no disponible';document.getElementById('modelInfo').textContent='Se esperaba el archivo ./camion.glb';});
+renderer.domElement.addEventListener('pointerdown',event=>{const rect=renderer.domElement.getBoundingClientRect();pointer.x=((event.clientX-rect.left)/rect.width)*2-1;pointer.y=-((event.clientY-rect.top)/rect.height)*2+1;raycaster.setFromCamera(pointer,camera);const hits=raycaster.intersectObjects(modelMeshes,false);if(hits.length)choose(hits[0].object);});
+document.getElementById('reset').addEventListener('click',()=>{if(root){frameModel();choose(null);}});
+document.getElementById('fit').addEventListener('click',frameModel);
+document.getElementById('wire').addEventListener('click',()=>{wireframe=!wireframe;modelMeshes.forEach(m=>{const original=originalMaterials.get(m);if(original&&original.wireframe!==undefined)original.wireframe=wireframe;});});
+function resize(){const w=stage.clientWidth,h=stage.clientHeight;if(!w||!h)return;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
+new ResizeObserver(resize).observe(stage);resize();
+function animate(){requestAnimationFrame(animate);controls.update();renderer.render(scene,camera);}animate();
+</script>
+</body>
+</html>
