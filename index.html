@@ -45,7 +45,7 @@ const hemiLight=new THREE.HemisphereLight(0xe6f4ff,0x52606a,2.5);scene.add(hemiL
 const key=new THREE.DirectionalLight(0xfff2d8,3.2);key.position.set(5,9,7);scene.add(key);
 const rim=new THREE.DirectionalLight(0x8dd7e5,1.25);rim.position.set(-7,4,-6);scene.add(rim);
 let sceneMode='day', weatherMode='clear', truckLightsEnabled=true, rainPoints=null, rainBounds=null;
-let engineRunning=false, engineAudioContext=null, engineGain=null, engineOscillators=[], engineAudioFilter=null, wheelAnimators=[];
+let engineRunning=false, wheelAnimators=[];
 const truckHeadlights=[],headlightBulbs=[];
 const grid=new THREE.GridHelper(30,30,0x29465c,0x1b2b3c);grid.material.opacity=.45;grid.material.transparent=true;scene.add(grid);
 let modelRoot=null, records=[], selectedId=null, colorMode=false, wireMode=false, labelsVisible=true;const meshById={};const labelsById={};let originalMaterials=new Map();
@@ -155,15 +155,35 @@ function setupWheelAnimation(root){
     const center=worldBox.getCenter(new THREE.Vector3());
     const sorted=[...dims].sort((x,y)=>y-x);
     const named=wheelName.test(obj.name||'');
-    const lowEnough=center.y<truckBox.min.y+truckSize.y*.96;
-    const wheelSized=sorted[0]>maxDim*.025&&sorted[0]<maxDim*(named?.68:.56);
-    // Una rueda debe tener dos dimensiones grandes y similares (diámetro),
-    // y una tercera dimensión menor (ancho). Esto excluye jaulas, barandas y chasis.
-    const roundProfile=sorted[1]>sorted[0]*(named?.58:.68);
-    const axleThin=sorted[2]<sorted[0]*(named?.90:.76);
-    if(named){
-      if(!wheelSized||!roundProfile||!axleThin)return;
-    }else if(!lowEnough||!wheelSized||!roundProfile||!axleThin)return;
+    // Las ruedas están en la mitad inferior del camión. Se descartan piezas
+    // de la jaula, escaleras y chasis aunque sus cajas se parezcan a un cilindro.
+    const lowEnough=center.y<truckBox.min.y+truckSize.y*.62;
+    const wheelSized=sorted[0]>maxDim*.035&&sorted[0]<maxDim*(named?.68:.43);
+    const roundProfile=sorted[1]>sorted[0]*(named?.62:.79);
+    const axleThin=sorted[2]<sorted[0]*(named?.90:.58);
+    if(!wheelSized||!roundProfile||!axleThin)return;
+    if(!named&&!lowEnough)return;
+
+    // Para mallas sin nombre de rueda, comprobar que los vértices forman
+    // una superficie circular y no una estructura rectangular tipo jaula.
+    if(!named){
+      const attr=obj.geometry.attributes.position;
+      if(!attr||attr.count<24)return;
+      const localBox=new THREE.Box3().setFromBufferAttribute(attr);
+      const localSize=localBox.getSize(new THREE.Vector3());
+      const axis=localSize.x<=localSize.y&&localSize.x<=localSize.z?0:(localSize.y<=localSize.z?1:2);
+      const centerLocal=localBox.getCenter(new THREE.Vector3());
+      const radii=[];
+      let maxRadius=0;
+      for(let i=0;i<attr.count;i++){
+        const v=new THREE.Vector3().fromBufferAttribute(attr,i).sub(centerLocal);
+        const radius=axis===0?Math.hypot(v.y,v.z):axis===1?Math.hypot(v.x,v.z):Math.hypot(v.x,v.y);
+        radii.push(radius);if(radius>maxRadius)maxRadius=radius;
+      }
+      if(maxRadius<=0)return;
+      const outerCount=radii.filter(radius=>radius>maxRadius*.78).length;
+      if(outerCount/radii.length<.48)return;
+    }
     rawCandidates.push({object:obj,center,dims,worldSize});
   });
 
@@ -194,69 +214,21 @@ function setupWheelAnimation(root){
   });
   console.info('Ruedas/piezas giratorias detectadas:',wheelAnimators.length,wheelAnimators.map(w=>({name:w.sourceName,center:w.center.toArray()})));
 }
-function initEngineAudio(){
-  const audio=document.getElementById('engineAudio');
-  if(!audio)return false;
-  audio.volume=0.78;
-  audio.loop=true;
-  audio.addEventListener('error',()=>console.warn('El archivo de sonido del motor no está disponible; se usará un sonido de respaldo.'));
-  return true;
-}
-let fallbackAudioContext=null,fallbackEngineNodes=[];
-function stopFallbackEngineSound(){
-  for(const node of fallbackEngineNodes){try{if(node.stop)node.stop();}catch{}try{node.disconnect();}catch{}}
-  fallbackEngineNodes=[];
-}
-function startFallbackEngineSound(){
-  try{
-    const AudioCtx=window.AudioContext||window.webkitAudioContext;
-    if(!AudioCtx)return false;
-    if(!fallbackAudioContext)fallbackAudioContext=new AudioCtx();
-    const ctx=fallbackAudioContext;
-    if(ctx.state==='suspended')ctx.resume();
-    stopFallbackEngineSound();
-    const master=ctx.createGain();master.gain.value=.0001;master.connect(ctx.destination);
-    master.gain.setTargetAtTime(.34,ctx.currentTime,.25);
-    const low=ctx.createOscillator();low.type='sawtooth';low.frequency.value=48;
-    const lowGain=ctx.createGain();lowGain.gain.value=.42;low.connect(lowGain);lowGain.connect(master);
-    const harmonic=ctx.createOscillator();harmonic.type='triangle';harmonic.frequency.value=96;
-    const harmonicGain=ctx.createGain();harmonicGain.gain.value=.16;harmonic.connect(harmonicGain);harmonicGain.connect(master);
-    const filter=ctx.createBiquadFilter();filter.type='lowpass';filter.frequency.value=190;filter.Q.value=.7;
-    const buffer=ctx.createBuffer(1,ctx.sampleRate*2,ctx.sampleRate),data=buffer.getChannelData(0);
-    for(let i=0;i<data.length;i++)data[i]=(Math.random()*2-1)*.18;
-    const noise=ctx.createBufferSource();noise.buffer=buffer;noise.loop=true;
-    const noiseGain=ctx.createGain();noiseGain.gain.value=.07;
-    noise.connect(filter);filter.connect(noiseGain);noiseGain.connect(master);
-    low.start();harmonic.start();noise.start();
-    fallbackEngineNodes=[master,low,lowGain,harmonic,harmonicGain,filter,noise,noiseGain];
-    return true;
-  }catch(err){console.warn('No se pudo iniciar el sonido de respaldo:',err);return false;}
-}
 function setEngineRunning(on){
   engineRunning=on;
   const btn=document.getElementById('engineBtn');
-  if(btn){btn.textContent=on?'⏻ Apagar camión':'⏻ Encender camión';btn.classList.toggle('running',on);btn.setAttribute('aria-pressed',String(on));}
-  const audio=document.getElementById('engineAudio');
+  if(btn){
+    btn.textContent=on?'⏻ Apagar camión':'⏻ Encender camión';
+    btn.classList.toggle('running',on);
+    btn.setAttribute('aria-pressed',String(on));
+    btn.title=on?'Apaga el camión simulado':'Enciende el camión simulado; las ruedas girarán sin sonido';
+  }
   if(on){
-    if(audio){
-      audio.currentTime=0;
-      audio.volume=0.9;
-      const playPromise=audio.play();
-      if(playPromise&&playPromise.then){
-        playPromise.then(()=>{
-          stopFallbackEngineSound();
-        }).catch(err=>{
-          console.warn('No se pudo reproducir el archivo de sonido del motor; se activa el sonido de respaldo:',err);
-          startFallbackEngineSound();
-        });
-      }else if(audio.error||audio.readyState===0)startFallbackEngineSound();
-      // Si el archivo no existe o falla después de llamar play(), usar respaldo.
-      if(audio.error)startFallbackEngineSound();
-    }else startFallbackEngineSound();
-    truckLightsEnabled=true;applySceneMode();
+    truckLightsEnabled=true;
+    applySceneMode();
+    document.getElementById('viewerHint').textContent='Camión encendido · Animación de ruedas activa · Sonido desactivado';
   }else{
-    if(audio){audio.pause();audio.currentTime=0;}
-    stopFallbackEngineSound();
+    document.getElementById('viewerHint').textContent='Camión apagado · Animación de ruedas detenida';
   }
 }
 document.getElementById('engineBtn').addEventListener('click',()=>setEngineRunning(!engineRunning));
@@ -357,5 +329,4 @@ document.getElementById('truckLightsBtn').addEventListener('click',()=>{truckLig
 const loader=new GLTFLoader();loader.load(modelUrl,gltf=>{modelRoot=gltf.scene;scene.add(modelRoot);buildComponents(modelRoot);frameModel(modelRoot);setupTruckLights(modelRoot);setupRain(modelRoot);setupWheelAnimation(modelRoot);document.getElementById('loading').style.display='none';document.getElementById('modelSub').textContent=records.length+' grupos/piezas detectados · marcadores de incidencias';document.getElementById('modelLabel').textContent='CAMIONMINERO.GLB · SOLIDWORKS';document.getElementById('importMsg').textContent='Indicadores de mantenimiento cargados. Los vínculos pieza-subsistema se guardan en este navegador.';buildAnnotationMarkers();renderAll();},progress=>{if(progress.total){const pct=Math.round(progress.loaded/progress.total*100);document.querySelector('#loading strong').textContent='Cargando camión minero 3D · '+pct+'%';}},err=>{document.getElementById('loading').innerHTML='<div><strong>No se pudo cargar camionminero.glb</strong><br><span class="muted">Coloca el archivo GLB en la misma carpeta que este HTML y vuelve a publicar ambos en GitHub Pages.</span></div>';console.error(err);});
 renderSystems();renderSystemSummary();
 </script>
-<audio id="engineAudio" src="./freesound_community-2019_08_31-00_25_00-044-045-044-086-17398.mp3" preload="auto" loop></audio>
 </body></html>
