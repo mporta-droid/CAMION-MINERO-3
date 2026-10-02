@@ -1,0 +1,24 @@
+GEMELO DIGITAL DE MANTENIMIENTO - CAMION MINERO
+
+Archivos:
+- index.html: aplicación web
+- camionminero.glb: modelo 3D externo
+
+PUBLICACIÓN EN GITHUB PAGES
+1. Extrae los tres archivos.
+2. Sube index.html y camionminero.glb a la raíz del repositorio CAMION-MINERO-3 (misma carpeta).
+3. En Settings > Pages, configura Deploy from a branch, rama main y carpeta /(root).
+4. Espera el despliegue y abre la URL de GitHub Pages.
+
+USO DE ASIGNACIÓN
+1. Selecciona un subsistema en la tabla lateral.
+2. Pulsa “Activar asignación de piezas”.
+3. Haz clic sobre una pieza visible del camión 3D.
+4. La pieza se vinculará al subsistema seleccionado y se pintará con su color.
+5. Repite para otras piezas; pulsa “Salir del modo asignación” al terminar.
+6. Las asignaciones se guardan en el navegador donde se realizaron.
+
+NOTAS
+- Algunas piezas se vinculan automáticamente por nombre (tolva, neumáticos, cilindros/pistones y bastidor/caterpillar). Revisa esos vínculos.
+- El modelo solo puede colorear componentes que realmente existan como piezas/mallas diferenciadas en el GLB. Si el motor, frenos, generador u otro subsistema no aparece como geometría separada, debe incorporarse/separarse en SolidWorks y volver a exportarse.
+- Para usar la app desde una carpeta local, ejecuta un servidor web local; no abras el HTML con doble clic, porque el navegador puede bloquear la carga del GLB.
