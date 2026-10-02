@@ -139,15 +139,16 @@ function setupTruckLights(root){
   headlightBulbs.forEach(x=>{scene.remove(x);if(x.geometry)x.geometry.dispose();if(x.material&&x.material.dispose)x.material.dispose();});headlightBulbs.length=0;
   if(root.userData.extraHeadlightMeshes){root.userData.extraHeadlightMeshes.forEach(x=>root.remove(x));root.userData.extraHeadlightMeshes=[];}
   const box=new THREE.Box3().setFromObject(root),size=box.getSize(new THREE.Vector3()),center=box.getCenter(new THREE.Vector3());
-  const alongX=size.x>=size.z, y=box.min.y+Math.max(.18,size.y*.30), sideSize=alongX?size.z:size.x;
-  // En este modelo la cabina/frente está hacia el extremo de X mínimo (o Z mínimo si el largo está en Z).
-  // Delante: luz cálida con haz y halo. Detrás: luces rojas de posición, sin proyectores.
+  const alongX=size.x>=size.z, sideSize=alongX?size.z:size.x;
+  // Corrección de orientación para este modelo: cabina/frente hacia X máximo (o Z máximo).
+  // Se elevan los faros delanteros para que queden más cerca de la zona de cabina.
+  const frontY=box.min.y+Math.max(.18,size.y*.40), rearY=box.min.y+Math.max(.18,size.y*.32);
   const front=alongX
-    ? {pos:new THREE.Vector3(box.min.x+size.x*.018,y,center.z),dir:new THREE.Vector3(-1,-.06,0)}
-    : {pos:new THREE.Vector3(center.x,y,box.min.z+size.z*.018),dir:new THREE.Vector3(0,-.06,-1)};
+    ? {pos:new THREE.Vector3(box.max.x-size.x*.018,frontY,center.z),dir:new THREE.Vector3(1,-.035,0)}
+    : {pos:new THREE.Vector3(center.x,frontY,box.max.z-size.z*.018),dir:new THREE.Vector3(0,-.035,1)};
   const rear=alongX
-    ? {pos:new THREE.Vector3(box.max.x-size.x*.018,y,center.z),dir:new THREE.Vector3(1,0,0)}
-    : {pos:new THREE.Vector3(center.x,y,box.max.z-size.z*.018),dir:new THREE.Vector3(0,0,1)};
+    ? {pos:new THREE.Vector3(box.min.x+size.x*.018,rearY,center.z),dir:new THREE.Vector3(-1,0,0)}
+    : {pos:new THREE.Vector3(center.x,rearY,box.min.z+size.z*.018),dir:new THREE.Vector3(0,0,-1)};
   const makeGlow=(pos,color,radius,opacity)=>{
     const m=new THREE.Mesh(new THREE.SphereGeometry(radius,20,14),new THREE.MeshBasicMaterial({color,transparent:true,opacity,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false}));
     m.position.copy(pos);m.visible=truckLightsEnabled;m.userData.baseOpacity=opacity;scene.add(m);headlightBulbs.push(m);return m;
