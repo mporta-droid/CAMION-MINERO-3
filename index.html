@@ -144,7 +144,7 @@ function setupWheelAnimation(root){
   const maxDim=Math.max(truckSize.x,truckSize.y,truckSize.z)||1;
   root.updateWorldMatrix(true,true);
   root.traverse(obj=>{
-    if(!obj.isMesh||!obj.geometry)return;
+    if(!obj.isMesh||!obj.geometry||!obj.parent)return;
     const worldBox=new THREE.Box3().setFromObject(obj);
     if(worldBox.isEmpty())return;
     const worldSize=worldBox.getSize(new THREE.Vector3());
@@ -152,32 +152,67 @@ function setupWheelAnimation(root){
     const center=worldBox.getCenter(new THREE.Vector3());
     const sorted=[...dims].sort((x,y)=>y-x);
     const named=wheelName.test(obj.name||'');
-    const lowEnough=center.y<truckBox.min.y+truckSize.y*.62;
-    const wheelSized=sorted[0]>maxDim*.035&&sorted[0]<maxDim*.40;
-    const roundProfile=sorted[1]>sorted[0]*.45;
-    const axleThin=sorted[2]<sorted[0]*.90;
+    const lowEnough=center.y<truckBox.min.y+truckSize.y*.78;
+    const wheelSized=sorted[0]>maxDim*.025&&sorted[0]<maxDim*(named?.58:.48);
+    const roundProfile=sorted[1]>sorted[0]*.40;
+    const axleThin=sorted[2]<sorted[0]*.98;
     if(!named&&(!lowEnough||!wheelSized||!roundProfile||!axleThin))return;
     if(named&&(!wheelSized||!roundProfile))return;
-    // Estima el eje de la rueda en coordenadas del mundo y lo convierte al sistema del padre.
+    const parent=obj.parent;
+    parent.updateWorldMatrix(true,false);
     const axleWorldIndex=dims.indexOf(Math.min(...dims));
     const axleWorld=new THREE.Vector3(axleWorldIndex===0?1:0,axleWorldIndex===1?1:0,axleWorldIndex===2?1:0);
-    let parentAxis=axleWorld.clone();
-    if(obj.parent){
-      obj.parent.updateWorldMatrix(true,false);
-      parentAxis.applyQuaternion(obj.parent.getWorldQuaternion(new THREE.Quaternion()).invert()).normalize();
-    }
-    candidates.push({object:obj,axisParentLocal:parentAxis,baseQuaternion:obj.quaternion.clone(),center,worldSize});
+    const parentAxisLocal=axleWorld.clone().applyQuaternion(parent.getWorldQuaternion(new THREE.Quaternion()).invert()).normalize();
+    // Pivote centrado en la geometría: la rueda gira sobre su eje aunque el origen del mesh esté desplazado.
+    const centerLocal=parent.worldToLocal(center.clone());
+    const pivot=new THREE.Group();
+    pivot.name='WheelSpinPivot_'+(obj.name||'wheel');
+    parent.add(pivot);
+    pivot.position.copy(centerLocal);
+    pivot.updateWorldMatrix(true,false);
+    pivot.attach(obj);
+    candidates.push({object:pivot,axisParentLocal:parentAxisLocal,baseQuaternion:pivot.quaternion.clone(),sourceName:obj.name||'mesh',center,worldSize});
   });
-  // No descarta las ruedas genéricas solo porque otras piezas ya tengan "wheel" en el nombre.
-  // Esto permite incluir las ruedas delanteras, que suelen estar modeladas con nombres diferentes.
   wheelAnimators=candidates;
+  console.info('Ruedas/piezas giratorias detectadas:',wheelAnimators.length,wheelAnimators.map(w=>w.sourceName));
 }
 function initEngineAudio(){
   const audio=document.getElementById('engineAudio');
   if(!audio)return false;
   audio.volume=0.78;
   audio.loop=true;
+  audio.addEventListener('error',()=>console.warn('El archivo de sonido del motor no está disponible; se usará un sonido de respaldo.'));
   return true;
+}
+let fallbackAudioContext=null,fallbackEngineNodes=[];
+function stopFallbackEngineSound(){
+  for(const node of fallbackEngineNodes){try{if(node.stop)node.stop();}catch{}try{node.disconnect();}catch{}}
+  fallbackEngineNodes=[];
+}
+function startFallbackEngineSound(){
+  try{
+    const AudioCtx=window.AudioContext||window.webkitAudioContext;
+    if(!AudioCtx)return false;
+    if(!fallbackAudioContext)fallbackAudioContext=new AudioCtx();
+    const ctx=fallbackAudioContext;
+    if(ctx.state==='suspended')ctx.resume();
+    stopFallbackEngineSound();
+    const master=ctx.createGain();master.gain.value=.0001;master.connect(ctx.destination);
+    master.gain.setTargetAtTime(.20,ctx.currentTime,.3);
+    const low=ctx.createOscillator();low.type='sawtooth';low.frequency.value=48;
+    const lowGain=ctx.createGain();lowGain.gain.value=.22;low.connect(lowGain);lowGain.connect(master);
+    const harmonic=ctx.createOscillator();harmonic.type='triangle';harmonic.frequency.value=96;
+    const harmonicGain=ctx.createGain();harmonicGain.gain.value=.08;harmonic.connect(harmonicGain);harmonicGain.connect(master);
+    const filter=ctx.createBiquadFilter();filter.type='lowpass';filter.frequency.value=190;filter.Q.value=.7;
+    const buffer=ctx.createBuffer(1,ctx.sampleRate*2,ctx.sampleRate),data=buffer.getChannelData(0);
+    for(let i=0;i<data.length;i++)data[i]=(Math.random()*2-1)*.18;
+    const noise=ctx.createBufferSource();noise.buffer=buffer;noise.loop=true;
+    const noiseGain=ctx.createGain();noiseGain.gain.value=.12;
+    noise.connect(filter);filter.connect(noiseGain);noiseGain.connect(master);
+    low.start();harmonic.start();noise.start();
+    fallbackEngineNodes=[master,low,lowGain,harmonic,harmonicGain,filter,noise,noiseGain];
+    return true;
+  }catch(err){console.warn('No se pudo iniciar el sonido de respaldo:',err);return false;}
 }
 function setEngineRunning(on){
   engineRunning=on;
@@ -185,11 +220,24 @@ function setEngineRunning(on){
   if(btn){btn.textContent=on?'⏻ Apagar camión':'⏻ Encender camión';btn.classList.toggle('running',on);btn.setAttribute('aria-pressed',String(on));}
   const audio=document.getElementById('engineAudio');
   if(on){
-    if(audio){audio.currentTime=0;const playPromise=audio.play();if(playPromise&&playPromise.catch)playPromise.catch(err=>console.warn('No se pudo reproducir el sonido del motor:',err));}
+    if(audio){
+      audio.currentTime=0;
+      const playPromise=audio.play();
+      if(playPromise&&playPromise.then){
+        playPromise.then(()=>stopFallbackEngineSound()).catch(err=>{
+          console.warn('No se pudo reproducir el archivo de sonido del motor:',err);
+          startFallbackEngineSound();
+        });
+      }else if(audio.error)startFallbackEngineSound();
+    }else startFallbackEngineSound();
     truckLightsEnabled=true;applySceneMode();
-  }else if(audio){audio.pause();audio.currentTime=0;}
+  }else{
+    if(audio){audio.pause();audio.currentTime=0;}
+    stopFallbackEngineSound();
+  }
 }
 document.getElementById('engineBtn').addEventListener('click',()=>setEngineRunning(!engineRunning));
+
 function animate(){requestAnimationFrame(animate);const t=performance.now()*.001;if(rainPoints&&rainBounds&&weatherMode==='rain'){const pos=rainPoints.geometry.attributes.position.array;for(let i=0;i<pos.length;i+=6){pos[i+1]-=.20;pos[i+4]-=.20;if(pos[i+1]<rainBounds.min.y){const x=rainBounds.min.x+Math.random()*(rainBounds.max.x-rainBounds.min.x);const z=rainBounds.min.z+Math.random()*(rainBounds.max.z-rainBounds.min.z);const y=rainBounds.max.y+Math.random()*1.5;pos[i]=x;pos[i+1]=y;pos[i+2]=z;pos[i+3]=x-.055;pos[i+4]=y-.22;pos[i+5]=z;}}rainPoints.geometry.attributes.position.needsUpdate=true;}for(const group of annotationMarkers.values()){const pulses=group.userData.pulseRings||[];pulses.forEach(p=>{const phase=((t*.72+(p.userData.phase||0))%1);const scale=.16+phase*.92;p.scale.setScalar(scale);p.material.opacity=.72*(1-phase);});const wave=.5+.5*Math.sin(t*3.1);if(group.userData.glowPin)group.userData.glowPin.material.emissiveIntensity=1.0+wave*.85;if(group.userData.glowHalo){group.userData.glowHalo.scale.setScalar(1+wave*.22);group.userData.glowHalo.material.opacity=.10+wave*.12;}}if(engineRunning){wheelAnimators.forEach(w=>{const spin=new THREE.Quaternion().setFromAxisAngle(w.axisParentLocal,t*2.8);w.object.quaternion.copy(w.baseQuaternion).premultiply(spin);});}controls.update();renderer.render(scene,camera);positionAnnotationLabels();positionAnnotationPopup();}animate();
 function setupTruckLights(root){
   truckHeadlights.forEach(x=>scene.remove(x));truckHeadlights.length=0;
