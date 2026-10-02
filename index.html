@@ -87,7 +87,7 @@ const markerMeshes = [];
 try { assignments = JSON.parse(localStorage.getItem('camionMineroSubsystemAssignmentsV2') || '{}') || {}; } catch(e) { assignments = {}; }
 try { annotations = JSON.parse(localStorage.getItem('camionMineroAnnotationsV1') || '[]') || []; } catch(e) { annotations = []; } { const unique=new Map(); annotations.forEach(a=>{if(a&&a.systemCode)unique.set(a.systemCode,a);}); annotations=Array.from(unique.values()); try{localStorage.setItem('camionMineroAnnotationsV1',JSON.stringify(annotations));}catch(e){} }
 const SUPABASE_URL='https://wjuuqmdvifihcmjohvgr.supabase.co';
-const SUPABASE_KEY='sb_publishable_feBpsh6HOuSLB1HiaxLZmw_TvdZI9NA';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqdXVxbWR2aWZpaGNtam9odmdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3MTAxMjIsImV4cCI6MjA5OTI4NjEyMn0.GTVQ8T_e7sddQ0VeasrohqcHsxIlT7kvVDPQIaePCDg';
 const localAssignmentsBackup=JSON.parse(JSON.stringify(assignments));
 const localAnnotationsBackup=JSON.parse(JSON.stringify(annotations));
 let supabaseSession=null, isAdmin=false, cloudReady=false, cloudIsEmpty=false, cloudSaveTimer=null;
